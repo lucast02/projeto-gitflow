@@ -22,4 +22,4 @@ jobs:
           java-version: '21'
 
       - name: Compilar projeto
-        run: javac calculadora.java
+        run: javac Calculadora.java
