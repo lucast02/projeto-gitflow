@@ -1,4 +1,4 @@
-name: Pipeline Java
+name: Pipeline Java com Seguranca
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [main, develop]
 
 jobs:
-  build:
+  build-security:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,10 +21,43 @@ jobs:
           java-version: '21'
 
       - name: Compilar projeto
-        run: javac Calculadora.java
+        run: javac --add-modules jdk.httpserver Calculadora.java
 
       - name: SAST - Instalar Semgrep
         run: python -m pip install semgrep
 
       - name: SAST - Analisar codigo Java
         run: semgrep scan --config p/java --error Calculadora.java
+
+      - name: Iniciar aplicacao para o DAST
+        run: |
+          nohup java --add-modules jdk.httpserver Calculadora > server.log 2>&1 &
+          for tentativa in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8080/health; then
+              echo "Aplicacao iniciada com sucesso."
+              break
+            fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:8080/health
+
+      - name: DAST - OWASP ZAP Baseline Scan
+        run: |
+          docker run --rm --network host \
+            -v "${{ github.workspace }}:/zap/wrk/:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://127.0.0.1:8080 \
+            -r /zap/wrk/zap-report.html \
+            -J /zap/wrk/zap-report.json \
+            -I
+
+      - name: Salvar relatorios do DAST
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-owasp-zap
+          path: |
+            zap-report.html
+            zap-report.json
+          if-no-files-found: warn
