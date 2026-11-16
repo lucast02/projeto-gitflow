@@ -1,4 +1,4 @@
-name: Pipeline Java com Seguranca
+name: Pipeline da calculadora
 
 on:
   push:
@@ -11,37 +11,37 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Baixar codigo
+      - name: Baixar o projeto
         uses: actions/checkout@v4
 
-      - name: Configurar Java
+      - name: Preparar o Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
 
-      - name: Compilar projeto
+      - name: Compilar a calculadora
         run: javac --add-modules jdk.httpserver Calculadora.java
 
-      - name: SAST - Instalar Semgrep
+      - name: Instalar o Semgrep (SAST)
         run: python -m pip install semgrep
 
-      - name: SAST - Analisar codigo Java
+      - name: Verificar o código com Semgrep
         run: semgrep scan --config p/java --error Calculadora.java
 
-      - name: Iniciar aplicacao para o DAST
+      - name: Colocar a calculadora no ar
         run: |
           nohup java --add-modules jdk.httpserver Calculadora > server.log 2>&1 &
           for tentativa in {1..30}; do
             if curl --fail --silent http://127.0.0.1:8080/health; then
-              echo "Aplicacao iniciada com sucesso."
+              echo "Calculadora iniciada com sucesso."
               break
             fi
             sleep 1
           done
           curl --fail http://127.0.0.1:8080/health
 
-      - name: DAST - OWASP ZAP Baseline Scan
+      - name: Testar a calculadora com OWASP ZAP (DAST)
         run: |
           docker run --rm --network host \
             -v "${{ github.workspace }}:/zap/wrk/:rw" \
@@ -52,7 +52,7 @@ jobs:
             -J /zap/wrk/zap-report.json \
             -I
 
-      - name: Salvar relatorios do DAST
+      - name: Guardar os relatórios do teste
         if: always()
         uses: actions/upload-artifact@v4
         with:
